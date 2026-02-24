@@ -10,7 +10,7 @@ function authMiddleware(req, res, next) {
   const token = authHeader.split(' ')[1]
 
   try {
-    const decoded = jwt.verify(token, 'segredo_super_forte')
+    const decoded = jwt.verify(token, process.env.JWT_SECRET)
 
     req.user = decoded
     next()
@@ -19,13 +19,5 @@ function authMiddleware(req, res, next) {
   }
 }
 
-const bcrypt = require('bcrypt')
-
-async function gerar() {
-  const hash = await bcrypt.hash('123456', 10)
-  console.log(hash)
-}
-
-gerar()
 
 module.exports = authMiddleware
