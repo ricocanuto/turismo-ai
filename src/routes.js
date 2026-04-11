@@ -1,201 +1,197 @@
-// const express = require('express')
-// const pool = require('./database')
-// const jwt = require('jsonwebtoken')
-// const bcrypt = require('bcrypt')
-// const auth = require('./middleware/auth')
+ const express = require('express')
+ const pool = require('./database')
+ const jwt = require('jsonwebtoken')
+ const bcrypt = require('bcrypt')
+ const auth = require('./middleware/auth')
 
-// const router = express.Router()
+ const router = express.Router()
 
-// router.get('/health', async (req, res) => {
-//     try {
-//         const result = await pool.query('SELECT NOW()')
-//         res.json({
-//             status: 'ok',
-//             server_time: result.rows[0]
-//         })
-//     } catch (err) {
-//         res.status(500).json({ error: err.message })
-//     }
-// })
+ router.get('/health', async (_req, res) => {
+     try {
+         const result = await pool.query('SELECT NOW()')
+         res.json({
+             status: 'ok',
+             server_time: result.rows[0]
+         })
+     } catch (err) {
+         res.status(500).json({ error: err.message })
+     }
+ })
+ router.post('/clientes', async (req, res) => {
+     try {
+         const { empresa_id, nome, telefone, idioma, origem } = req.body
 
-// router.post('/clientes', async (req, res) => {
-//     try {
-//         const { empresa_id, nome, telefone, idioma, origem } = req.body
+         const result = await pool.query(
+             `INSERT INTO clientes (empresa_id, nome, telefone, idioma, origem)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING *`,
+             [empresa_id, nome, telefone, idioma, origem]
+         )
 
-//         const result = await pool.query(
-//             `INSERT INTO clientes (empresa_id, nome, telefone, idioma, origem)
-//        VALUES ($1, $2, $3, $4, $5)
-//        RETURNING *`,
-//             [empresa_id, nome, telefone, idioma, origem]
-//         )
+         res.status(201).json(result.rows[0])
+     } catch (err) {
+         res.status(500).json({ error: err.message })
+     }
+ })
 
-//         res.status(201).json(result.rows[0])
-//     } catch (err) {
-//         res.status(500).json({ error: err.message })
-//     }
-// })
+ router.post('/reservas', auth, async (req, res) => {
+     try {
+         const {
+             empresa_id,
+             cliente_id,
+             data_passeio,
+             horario,
+             valor,
+             status,
+             sinal_pago
+         } = req.body
+         const result = await pool.query(
+             `INSERT INTO reservas
+        (empresa_id, cliente_id, data_passeio, horario, valor, status, sinal_pago)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING *`,
+             [
+                 empresa_id,
+                 cliente_id,
+                 data_passeio,
+                 horario,
+                 valor,
+                 status || 'pendente',
+                 sinal_pago || false
+             ]
+         )
 
-// router.post('/reservas', auth, async (req, res) => {
-//     try {
-//         const {
-//             empresa_id,
-//             cliente_id,
-//             data_passeio,
-//             horario,
-//             valor,
-//             status,
-//             sinal_pago
-//         } = req.body
+         res.status(201).json(result.rows[0])
+     } catch (err) {
+         res.status(500).json({ error: err.message })
+     }
+ })
 
-//         const result = await pool.query(
-//             `INSERT INTO reservas
-//        (empresa_id, cliente_id, data_passeio, horario, valor, status, sinal_pago)
-//        VALUES ($1, $2, $3, $4, $5, $6, $7)
-//        RETURNING *`,
-//             [
-//                 empresa_id,
-//                 cliente_id,
-//                 data_passeio,
-//                 horario,
-//                 valor,
-//                 status || 'pendente',
-//                 sinal_pago || false
-//             ]
-//         )
+ router.get('/reservas', auth, async (_req, res) => {
+     try {
+         const result = await pool.query(`
+       SELECT 
+         r.*,
+         c.nome,
+         c.telefone,
+         c.idioma,
+         c.origem
+       FROM reservas r
+       JOIN clientes c ON r.cliente_id = c.id
+       ORDER BY r.created_at DESC
+     `)
 
-//         res.status(201).json(result.rows[0])
-//     } catch (err) {
-//         res.status(500).json({ error: err.message })
-//     }
-// })
+         res.json(result.rows)
+     } catch (err) {
+         res.status(500).json({ error: err.message })
+     }
+ })
 
-// router.get('/reservas', auth, async (req, res) => {
-//     try {
-//         const result = await pool.query(`
-//       SELECT 
-//         r.*,
-//         c.nome,
-//         c.telefone,
-//         c.idioma,
-//         c.origem
-//       FROM reservas r
-//       JOIN clientes c ON r.cliente_id = c.id
-//       ORDER BY r.created_at DESC
-//     `)
+ router.get('/relatorio/faturamento/:empresaId', async (req, res) => {
+     const { empresaId } = req.params
+     const { data_inicio, data_fim } = req.query
 
-//         res.json(result.rows)
-//     } catch (err) {
-//         res.status(500).json({ error: err.message })
-//     }
-// })
+     try {
+         let query = `
+       SELECT
+         COUNT(*) as total_reservas,
+         COALESCE(SUM(valor), 0) as faturamento_total,
+         COALESCE(SUM(CASE WHEN sinal_pago = false THEN valor ELSE 0 END), 0) as valor_pendente
+       FROM reservas
+       WHERE empresa_id = $1
+       AND status != 'cancelado'
+     `
 
-// router.get('/relatorio/faturamento/:empresaId', async (req, res) => {
-//     const { empresaId } = req.params
-//     const { data_inicio, data_fim } = req.query
+         const values = [empresaId]
 
-//     try {
-//         let query = `
-//       SELECT
-//         COUNT(*) as total_reservas,
-//         COALESCE(SUM(valor), 0) as faturamento_total,
-//         COALESCE(SUM(CASE WHEN sinal_pago = false THEN valor ELSE 0 END), 0) as valor_pendente
-//       FROM reservas
-//       WHERE empresa_id = $1
-//       AND status != 'cancelado'
-//     `
+         if (data_inicio && data_fim) {
+             query += ` AND data_passeio BETWEEN $2 AND $3`
+             values.push(data_inicio, data_fim)
+         }
 
-//         const values = [empresaId]
+         const resultado = await pool.query(query, values)
 
-//         if (data_inicio && data_fim) {
-//             query += ` AND data_passeio BETWEEN $2 AND $3`
-//             values.push(data_inicio, data_fim)
-//         }
+         res.json(resultado.rows[0]);
+     } catch (err) {
+         res.status(500).json({ error: err.message });
+     }
+ })
 
-//         const resultado = await pool.query(query, values)
+ router.patch('/reservas/:id/cancelar', async (req, res) => {
+   const { id } = req.params
+   const empresa_id = req.user.empresaId
 
-//         res.json(resultado.rows[0]);
-//     } catch (err) {
-//         res.status(500).json({ error: err.message });
-//     }
-// })
+   try {
+     const result = await pool.query(
+       `UPDATE reservas
+        SET status = 'cancelado'
+        WHERE id = $1
+        AND empresa_id = $2
+        RETURNING *`,
+       [id, empresa_id]
+     )
 
-// router.patch('/reservas/:id/cancelar', async (req, res) => {
-//   const { id } = req.params
-//   const empresa_id = req.user.empresaId
+     if (result.rows.length === 0) {
+       return res.status(404).json({ error: 'Reserva não encontrada' })
+     }
 
-//   try {
-//     const result = await pool.query(
-//       `UPDATE reservas
-//        SET status = 'cancelado'
-//        WHERE id = $1
-//        AND empresa_id = $2
-//        RETURNING *`,
-//       [id]
-//     )
+     res.json(result.rows[0])
+   } catch (err) {
+     res.status(500).json({ error: err.message })
+   }
+ })
 
-//     if (result.rows.length === 0) {
-//       return res.status(404).json({ error: 'Reserva não encontrada' })
-//     }
+ router.post('/auth/register', async (req, res) => {
+   const { empresa_id, nome, email, senha } = req.body
 
-//     res.json(result.rows[0])
-//   } catch (err) {
-//     res.status(500).json({ error: err.message })
-//   }
-// })
+   try {
+     const senhaHash = await bcrypt.hash(senha, 10)
 
-// router.post('/auth/register', async (req, res) => {
-//   const { empresa_id, nome, email, senha } = req.body
+     const result = await pool.query(
+       `INSERT INTO usuarios (empresa_id, nome, email, senha)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id, nome, email`,
+       [empresa_id, nome, email, senhaHash]
+     )
 
-//   try {
-//     const senhaHash = await bcrypt.hash(senha, 10)
+     res.status(201).json(result.rows[0])
+   } catch (err) {
+     res.status(500).json({ error: err.message })
+   }
+ })
 
-//     const result = await pool.query(
-//       `INSERT INTO usuarios (empresa_id, nome, email, senha)
-//        VALUES ($1, $2, $3, $4)
-//        RETURNING id, nome, email`,
-//       [empresa_id, nome, email, senhaHash]
-//     )
+ router.post('/auth/login', async (req, res) => {
+   const { email, senha } = req.body
 
-//     res.status(201).json(result.rows[0])
-//   } catch (err) {
-//     res.status(500).json({ error: err.message })
-//   }
-// })
+   try {
+     const result = await pool.query(
+       `SELECT * FROM usuarios WHERE email = $1`,
+       [email]
+     )
 
-// router.post('/auth/login', async (req, res) => {
-//   const { email, senha } = req.body
+     if (result.rows.length === 0) {
+       return res.status(401).json({ error: 'Usuário não encontrado' })
+     }
 
-//   try {
-//     const result = await pool.query(
-//       `SELECT * FROM usuarios WHERE email = $1`,
-//       [email]
-//     )
+     const usuario = result.rows[0]
+     const senhaValida = await bcrypt.compare(senha, usuario.senha)
 
-//     if (result.rows.length === 0) {
-//       return res.status(401).json({ error: 'Usuário não encontrado' })
-//     }
+     if (!senhaValida) {
+       return res.status(401).json({ error: 'Senha inválida' })
+     }
 
-//     const usuario = result.rows[0]
+     const token = jwt.sign(
+       { 
+         userId: usuario.id,
+         empresaId: usuario.empresa_id
+       },
+       'segredo_super_forte',
+       { expiresIn: '8h' }
+     )
+     res.json({ token })
+   } catch (err) {
+     res.status(500).json({ error: err.message })
+   }
+ })
 
-//     const senhaValida = await bcrypt.compare(senha, usuario.senha)
-
-//     if (!senhaValida) {
-//       return res.status(401).json({ error: 'Senha inválida' })
-//     }
-
-//     const token = jwt.sign(
-//       { 
-//         userId: usuario.id,
-//         empresaId: usuario.empresa_id
-//       },
-//       'segredo_super_forte',
-//       { expiresIn: '8h' }
-//     )
-
-//     res.json({ token })
-//   } catch (err) {
-//     res.status(500).json({ error: err.message })
-//   }
-// })
-
-//     module.exports = router
+     module.exports = router 
