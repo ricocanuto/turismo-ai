@@ -8,7 +8,7 @@ router.post('/', auth, async (req, res) => {
   const empresa_id = req.user.empresaId
 
   const result = await pool.query(
-    `INSERT INTO clientes (empresa_id, nome, telefone, origem)
+    `INSERT INTO "Clientes" (empresa_id, nome, telefone, origem)
      VALUES ($1, $2, $3, $4)
      RETURNING *`,
     [empresa_id, nome, telefone, origem]
@@ -21,7 +21,7 @@ router.get('/', auth, async (req, res) => {
   const empresa_id = req.user.empresaId
 
   const result = await pool.query(
-    `SELECT * FROM clientes WHERE empresa_id = $1`,
+    `SELECT * FROM Clientes" WHERE empresa_id = $1`,
     [empresa_id]
   )
 

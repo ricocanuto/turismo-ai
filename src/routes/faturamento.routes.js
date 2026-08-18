@@ -9,7 +9,7 @@ router.get('/faturamento', auth, async (req, res) => {
 
   const result = await pool.query(
     `SELECT SUM(valor) AS total
-     FROM reservas
+     FROM "reservas"
      WHERE empresa_id = $1 AND status = 'confirmado'`,
     [empresa_id]
   )
@@ -23,7 +23,7 @@ router.patch('/:id/cancelar', auth, async (req, res) => {
   const empresa_id = req.user.empresaId
 
   const result = await pool.query(
-    `UPDATE reservas
+    `UPDATE "reservas"
      SET status = 'cancelado'
      WHERE id = $1 AND empresa_id = $2
      RETURNING *`,

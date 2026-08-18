@@ -22,7 +22,7 @@
          const { empresa_id, nome, telefone, idioma, origem } = req.body
 
          const result = await pool.query(
-             `INSERT INTO clientes (empresa_id, nome, telefone, idioma, origem)
+             `INSERT INTO "Clientes" (empresa_id, nome, telefone, idioma, origem)
         VALUES ($1, $2, $3, $4, $5)
         RETURNING *`,
              [empresa_id, nome, telefone, idioma, origem]
@@ -46,7 +46,7 @@
              sinal_pago
          } = req.body
          const result = await pool.query(
-             `INSERT INTO reservas
+             `INSERT INTO "Reservas"
         (empresa_id, cliente_id, data_passeio, horario, valor, status, sinal_pago)
         VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING *`,
@@ -76,7 +76,7 @@
          c.telefone,
          c.idioma,
          c.origem
-       FROM reservas r
+       FROM "Reservas" r
        JOIN clientes c ON r.cliente_id = c.id
        ORDER BY r.created_at DESC
      `)
@@ -97,7 +97,7 @@
          COUNT(*) as total_reservas,
          COALESCE(SUM(valor), 0) as faturamento_total,
          COALESCE(SUM(CASE WHEN sinal_pago = false THEN valor ELSE 0 END), 0) as valor_pendente
-       FROM reservas
+       FROM "Reservas"
        WHERE empresa_id = $1
        AND status != 'cancelado'
      `
@@ -148,7 +148,7 @@
      const senhaHash = await bcrypt.hash(senha, 10)
 
      const result = await pool.query(
-       `INSERT INTO usuarios (empresa_id, nome, email, senha)
+       `INSERT INTO "Users" (empresa_id, nome, email, senha)
         VALUES ($1, $2, $3, $4)
         RETURNING id, nome, email`,
        [empresa_id, nome, email, senhaHash]
@@ -165,7 +165,7 @@
 
    try {
      const result = await pool.query(
-       `SELECT * FROM usuarios WHERE email = $1`,
+       `SELECT * FROM "Users" WHERE email = $1`,
        [email]
      )
 
